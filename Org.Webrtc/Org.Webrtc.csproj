@@ -10,7 +10,6 @@
     <RootNamespace>Org.Webrtc</RootNamespace>
     <AssemblyName>Org.Webrtc</AssemblyName>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkVersion>v4.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -35,9 +34,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
-    <Reference Include="Mono.Android">
-      <HintPath>C:\Program Files %28x86%29\Reference Assemblies\Microsoft\Framework\MonoAndroid\v4.1\Mono.Android.dll</HintPath>
-    </Reference>
+    <Reference Include="Mono.Android" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />

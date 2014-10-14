@@ -216,12 +216,16 @@ namespace Appspotdemo.Mono.Droid
 			base.OnDestroy();
 		}
 
-		public void onAddRenderer(VideoTrack videoTrack, bool local)
+		VideoTrack g_VideoTrack;
+		public void onAddRenderer(Java.Lang.Object stream/*VideoTrack videoTrack*/, bool local)
 		{
-			if (local == true)
-				videoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.LOCAL)));
-			else
-				videoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.REMOTE)));
+			if (local) {
+				g_VideoTrack = (VideoTrack)stream;
+				g_VideoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.LOCAL)));
+			} else {
+				//RunOnUiThread (()=>videoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.REMOTE))));
+				RunOnUiThread (()=>g_VideoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.REMOTE))));
+			}
 		}
 
 		public void onStatusMessage(string msg)

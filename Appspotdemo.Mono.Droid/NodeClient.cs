@@ -58,7 +58,8 @@ namespace Appspotdemo.Mono.Droid
 
 		public interface NodeClientObserver
 		{
-			void onAddRenderer (VideoTrack videoTrack, bool local);
+			//void onAddRenderer (VideoTrack videoTrack, bool local);
+			void onAddRenderer (Java.Lang.Object stream, bool local);
 			void onStatusMessage(string msg);
 			void onClose();
 		}
@@ -570,7 +571,8 @@ namespace Appspotdemo.Mono.Droid
 					{
 						abortUnless(stream.AudioTracks.Size() <= 1 && stream.VideoTracks.Size() <= 1, "Weird-looking stream: " + stream);
 						if (stream.VideoTracks.Size() == 1) {
-							outerInstance.nodeClientObserver.onAddRenderer((Org.Webrtc.VideoTrack)stream.VideoTracks.Get(0), false);
+							//Org.Webrtc.VideoTrack track = (Org.Webrtc.VideoTrack)stream.VideoTracks.Get(0);
+							outerInstance.nodeClientObserver.onAddRenderer(stream.VideoTracks.Get(0), false);
 						}
 					}
 					catch(Exception e) {
@@ -763,12 +765,12 @@ namespace Appspotdemo.Mono.Droid
 
                 outerInstance.peer = outerInstance.factory.CreatePeerConnection(outerInstance.iceServers, outerInstance.optionalArgument, this);
 
-				if (outerInstance.stream != null)
-					outerInstance.peer.AddStream(outerInstance.stream, new MediaConstraints());
+				if (_option.stream != null)
+					outerInstance.peer.AddStream(_option.stream, new MediaConstraints());
 
-                outerInstance.peer.SetRemoteDescription(outerInstance.sdpObserver, _option.sdp);
-
-                outerInstance.peer.CreateAnswer(outerInstance.sdpObserver, outerInstance.offerAnswerConstraints);
+				outerInstance.peer.SetRemoteDescription(outerInstance.sdpObserver, _option.sdp);
+                 
+				outerInstance.peer.CreateAnswer(outerInstance.sdpObserver, outerInstance.offerAnswerConstraints);
 			}
 
             public void OnAddStream(MediaStream stream)
@@ -811,7 +813,7 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "Answer::OnRemoveStream == >");
 
-                //outerInstance.activity.RunOnUiThread(() => stream.VideoTracks.Get(0).Dispose());
+                outerInstance.activity.RunOnUiThread(() => stream.VideoTracks.Get(0).Dispose());
             }
 
 			public void OnRenegotiationNeeded ()
@@ -844,14 +846,14 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "SDPObserver::OnCreateSuccess == >");
 
-				SessionDescription sdp = new SessionDescription(origSdp.Type, outerInstance.preferISAC(origSdp.Description));
-				outerInstance.peer.SetLocalDescription(outerInstance.sdpObserver, sdp);
+				//SessionDescription sdp = new SessionDescription(origSdp.Type, outerInstance.preferISAC(origSdp.Description));
+				outerInstance.peer.SetLocalDescription(outerInstance.sdpObserver, origSdp);
 
 				if (origSdp.Type == SessionDescription.SessionDescriptionType.Answer) {
-					option.onSdp(sdp, option.to);
+					option.onSdp(origSdp, option.to);
 				}
             }
-
+			 
             public void OnSetSuccess()
             {
                 Log.Debug(TAG, "SDPObserver::OnSetSuccess == >");
