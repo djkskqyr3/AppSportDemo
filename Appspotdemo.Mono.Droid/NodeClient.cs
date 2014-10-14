@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading;
 using System.Collections.Generic;
 using Android.App;
 using Android.OS;
@@ -30,8 +31,7 @@ namespace Appspotdemo.Mono.Droid
 		private Signaler signaler;
 		private bool capturingUserMedia = false;
 
-		private readonly UserMediaObserver userMediaObserver;
-		private readonly AddStreamObserver addStreamObserver;
+		private NodeClientObserver nodeClientObserver;
 
 		private PeerConnectionFactory factory;
         private SDPObserver sdpObserver;
@@ -44,7 +44,7 @@ namespace Appspotdemo.Mono.Droid
 
 		private MediaStream stream;       
 		private JSONObject room;
-        
+		private Org.Webrtc.VideoSource videoSource;
 
         private MediaConstraints offerAnswerConstraints;
 		private MediaConstraints videoConstrants;
@@ -56,11 +56,22 @@ namespace Appspotdemo.Mono.Droid
  
 		private List<PeerConnection.IceServer> iceServers = new List<PeerConnection.IceServer>();        
 
+		public interface NodeClientObserver
+		{
+			void onAddRenderer (VideoTrack videoTrack, bool local);
+			void onStatusMessage(string msg);
+			void onClose();
+		}
+
 		public void onMeeting(JSONObject value)
         {
 			string roomid = (string)value.Get("roomid");
-			if (joinRoom != null && roomid != joinRoom)
-                return;
+			if (joinRoom != null && roomid != joinRoom) {
+				if (nodeClientObserver != null)
+					nodeClientObserver.onStatusMessage("Please input correct room number.");
+				LeaveRoom ();
+				return;
+			}
 
             if (detectedRoom) return;
             detectedRoom = true;
@@ -73,10 +84,35 @@ namespace Appspotdemo.Mono.Droid
             signaler = new Signaler(this);
         }
 
-		public interface UserMediaObserver
+		// Cycle through likely device names for the camera and return the first
+		// capturer that works, or crash if none do.
+		private VideoCapturer VideoCapturer
 		{
-			void onUserMediaObserver (JSONObject constraints);
+			get
+			{
+				string[] cameraFacing = new string[] { "front", "back" };
+				int[] cameraIndex = new int[] { 0, 1 };
+				int[] cameraOrientation = new int[] { 0, 90, 180, 270 };
+				foreach (string facing in cameraFacing)
+				{
+					foreach (int index in cameraIndex)
+					{
+						foreach (int orientation in cameraOrientation)
+						{
+							string name = "Camera " + index + ", Facing " + facing + ", Orientation " + orientation;
+							VideoCapturer capturer = VideoCapturer.Create(name);
+							if (capturer != null)
+							{
+								Log.Debug (TAG, "Using camera: " + name);
+								return capturer;
+							}
+						}
+					}
+				}
+				throw new Exception("Failed to open capturer");
+			}
 		}
+
 
 		void captureUserMedia()
 		{
@@ -87,50 +123,67 @@ namespace Appspotdemo.Mono.Droid
 			jsonPut(json, "audio", true);
 			jsonPut(json, "video", true);
 
-			userMediaObserver.onUserMediaObserver (json);
-		}
+			factory = new PeerConnectionFactory();
 
-		public void onStream(PeerConnectionFactory factory, MediaStream stream)
-		{
-			this.stream = stream;
-			this.factory = factory;
+			if (nodeClientObserver != null)
+				nodeClientObserver.onStatusMessage("Creating local video source...");
+
+			this.stream = factory.CreateLocalMediaStream("ARDAMS");
+			if (json.Has ("video")) {
+				VideoCapturer capturer = VideoCapturer;
+
+				if (capturer == null) {
+					onError ();
+					return;
+				}
+				videoSource = factory.CreateVideoSource (capturer, videoConstrants);
+				VideoTrack videoTrack = factory.CreateVideoTrack("ARDAMSv0", videoSource);
+
+				if (nodeClientObserver != null)
+					nodeClientObserver.onAddRenderer (videoTrack, true);
+
+				this.stream.AddTrack(videoTrack);
+			}
+
+			if (json.Has ("audio")) {
+
+				this.stream.AddTrack(factory.CreateAudioTrack("ARDAMSa0"));
+			}
+
+
+			if (nodeClientObserver != null)
+				nodeClientObserver.onStatusMessage("Waiting for ICE candidates...");
 
 			if (is_setup == true)
 			{
 				Log.Debug(TAG, Status.Status01);
 
-				JSONObject json = new JSONObject();
-				jsonPut(json, "roomid", joinRoom);
-				jsonPut(json, "user_hash", this.userId);
-				jsonPut(json, "url", app_id==null?"":app_id);
+				JSONObject broad = new JSONObject();
+				jsonPut(broad, "roomid", joinRoom);
+				jsonPut(broad, "user_hash", this.userId);
+				jsonPut(broad, "url", app_id);
 
-				signaler.broadcast(json);
+				signaler.broadcast(broad);
 			}
 			else
 			{
 				Log.Debug(TAG, Status.Status02);
 
-				JSONObject json = new JSONObject();
-				jsonPut(json, "to", (string)this.room.Get("userid"));
-				jsonPut(json, "roomid", this.joinRoom);
-				jsonPut(json, "url", this.app_id==null?"":this.app_id);
-				jsonPut(json, "user_hash", signaler.userid);
+				JSONObject broad = new JSONObject();
+				jsonPut(broad, "to", (string)this.room.Get("userid"));
+				jsonPut(broad, "roomid", this.joinRoom);
+				jsonPut(broad, "url", this.app_id==null?"":this.app_id);
+				jsonPut(broad, "user_hash", signaler.userid);
 
-				signaler.Join(json);
+				signaler.Join(broad);
 			}
 
 			capturingUserMedia = false;
 		}
 
-		void onError()
+		public void onError()
 		{
-			JSONObject json = new JSONObject();
-			jsonPut(json, "leaving", true);
-			jsonPut(json, "roomid", joinRoom);
-			jsonPut(json, "app_id", app_id==null?"":app_id);
-			jsonPut(json, "user_hash", this.userId);
-
-			signaler.signal(json);
+			signaler.LeaveRoom ();
 		}
 
 		// setup new meeting room
@@ -141,7 +194,8 @@ namespace Appspotdemo.Mono.Droid
 			this.userId = userid;
 			this.app_id = app_id;
 
-			Log.Debug(TAG, Status.Status00);
+			if (nodeClientObserver != null)
+				nodeClientObserver.onStatusMessage("Create room number(" + this.joinRoom + ")");
 
 			if (signaler == null)
 			{
@@ -155,7 +209,8 @@ namespace Appspotdemo.Mono.Droid
 		{
 			is_setup = false;            
 
-			Log.Debug(TAG, Status.Status00);
+			if (nodeClientObserver != null)
+				nodeClientObserver.onStatusMessage(Status.Status00);
 
 			if (signaler == null)
 			{
@@ -177,7 +232,7 @@ namespace Appspotdemo.Mono.Droid
 
         public class Signaler
         {
-            private readonly NodeClient outerInstance;
+			private readonly NodeClient outerInstance;
 
 			public string userid;
 			private bool isbroadcaster = false;
@@ -194,19 +249,19 @@ namespace Appspotdemo.Mono.Droid
             
             private string roomid;
 
-			public Client _socket;            
+			public Client _socket;       
+
+			private System.Timers.Timer mTimer;
 
             public Signaler(NodeClient outerInstance)
             {
-                this.outerInstance = outerInstance;
-				if (this.userid == null)
+				this.outerInstance = outerInstance;
+				if (outerInstance.userId == null)
                 {
-					this.userid = outerInstance.getToken();
+					outerInstance.userId = outerInstance.getToken();
                 }
-                else
-                {
-					this.userid = outerInstance.userId;
-                }
+
+				this.userid = outerInstance.userId;               
 
 				_socket = new Client(string.Format(outerInstance.domain));
 
@@ -219,6 +274,12 @@ namespace Appspotdemo.Mono.Droid
 				_socket.Connect();
             }
 
+			public void Dispose()
+			{
+				_socket.Close ();
+				_socket = null;
+			}
+
 			void SocketOpened(object sender, System.EventArgs e)
 			{
 
@@ -226,13 +287,14 @@ namespace Appspotdemo.Mono.Droid
 
 			void SocketConnectionClosed(object sender, System.EventArgs e)
 			{
-				Log.Debug(TAG, "WebSocketConnection was terminated!");
+				if (outerInstance.nodeClientObserver != null)
+					outerInstance.nodeClientObserver.onStatusMessage("WebSocketConnection was terminated!");
 			}
 
 			void SocketError(object sender, ErrorEventArgs e)
 			{
-				Log.Debug(TAG, "socket client error:");
-				Log.Debug(TAG, e.Message); 
+				if (outerInstance.nodeClientObserver != null)
+					outerInstance.nodeClientObserver.onStatusMessage("socket client error:" + e.Message);
 			}
 
 			void SocketMessage(object sender, MessageEventArgs e)
@@ -252,9 +314,61 @@ namespace Appspotdemo.Mono.Droid
                     
 				JSONObject value = new JSONObject(json.GetJSONArray ("args").GetString(0));
 
+				string userId = (string)value.Get ("userid");
+				if (userId.Equals (this.userid))
+					return;
+	
+				//if conference terminate
+				if (value.Has ("leaving")) {
+
+					bool leaving = value.GetBoolean ("leaving");
+					if (leaving == true) {
+						if (outerInstance.joinRoom.Equals ((string)value.Get ("roomid"))) {
+
+							this.roomFull = false;
+
+							if (outerInstance.peer != null) {
+								try
+								{
+									outerInstance.LeaveRoom();
+
+									outerInstance.peer.Close();
+									outerInstance.peer.Dispose();
+									outerInstance.peer = null;
+
+									if(outerInstance.userId != null && userId != outerInstance.userId){
+										if (outerInstance.nodeClientObserver != null)
+											outerInstance.nodeClientObserver.onStatusMessage(Status.Status10);
+									}
+									else {
+										if (outerInstance.nodeClientObserver != null)
+											outerInstance.nodeClientObserver.onStatusMessage(Status.Status05);
+									}
+								}
+								catch (Exception ex)
+								{
+									throw new Exception("Error", ex);
+								}
+							}
+
+							outerInstance.nodeClientObserver.onClose ();
+
+							System.Threading.Thread.Sleep(5000);
+
+							if (outerInstance.videoSource != null)
+							{
+								outerInstance.videoSource.Stop ();
+								outerInstance.videoSource.Dispose ();
+								outerInstance.videoSource = null;
+							}
+
+							return;
+						}
+					}
+				}
+
 				if (!isbroadcaster && value.Has ("roomid") && value.Has ("broadcasting") && !sentParticipationRequest) {
 					this.outerInstance.onMeeting (value);
-					Log.Debug (TAG, Status.Status03);
 				} else {
 					Log.Debug (TAG, e.Message.Json.ToJsonString());
 				}
@@ -278,12 +392,12 @@ namespace Appspotdemo.Mono.Droid
 				// if someone sent participation request
 				if (value.Has("participationRequest")) {	
 					string to = (string)value.Get ("to");
-					string userId = (string)value.Get ("userid");
 					if (to.Equals (this.userid)) {
 						if (!roomFull) {
 							roomFull = true;
 							participationRequest(userId);
-							Log.Debug(TAG, Status.Status04);
+							if (outerInstance.nodeClientObserver != null)
+								outerInstance.nodeClientObserver.onStatusMessage(Status.Status04);
 						}
 						else 
 						{
@@ -323,7 +437,8 @@ namespace Appspotdemo.Mono.Droid
 				if (value.Has("isRoomFull")) {		
 					string messageFor = (string)value.Get ("messageFor");
 					if (messageFor.Equals (this.userid)) {
-						Log.Debug (TAG, Status.Status09);
+						if (outerInstance.nodeClientObserver != null)
+							outerInstance.nodeClientObserver.onStatusMessage(Status.Status09);
 					}
 				}
 			}
@@ -400,11 +515,12 @@ namespace Appspotdemo.Mono.Droid
             {
                 if (message.Has("candidate"))
                 {
-                    outerInstance.peer.AddIceCandidate((IceCandidate)message.Get("candidate"));
+					JSONObject json = new JSONObject((string)message.Get("candidate"));
+					outerInstance.peer.AddIceCandidate (new IceCandidate(json.GetString("sdpMid"), json.GetInt("sdpMLineIndex"), json.GetString("candidate")));
                 }
             }
 
-            public class Options
+			public class Options : Java.Lang.Object
             {
                 private readonly NodeClient outerInstance;
                 private readonly Signaler signaler;
@@ -446,13 +562,25 @@ namespace Appspotdemo.Mono.Droid
                     signaler.signal(json);
                 }
 
-                public void onAddstream(MediaStream stream, string to)
+				public void onAddstream(MediaStream stream, string to)
                 {
-                    Log.Debug(TAG, "Options::onAddstream >>> " + stream);
+					Log.Debug(TAG, "Options::onAddstream >>> " + stream);
                     
-                    outerInstance.addStreamObserver.onAddStreamObserver(stream);
+					try
+					{
+						abortUnless(stream.AudioTracks.Size() <= 1 && stream.VideoTracks.Size() <= 1, "Weird-looking stream: " + stream);
+						if (stream.VideoTracks.Size() == 1) {
+							outerInstance.nodeClientObserver.onAddRenderer((Org.Webrtc.VideoTrack)stream.VideoTracks.Get(0), false);
+						}
+					}
+					catch(Exception e) {
+						if (outerInstance.nodeClientObserver != null)
+							outerInstance.nodeClientObserver.onStatusMessage(e.Message);
+					}
                 }
             }
+
+			private JSONObject sendBroadcast;
 
             // call only for session initiator
             public void broadcast(JSONObject json)
@@ -463,21 +591,24 @@ namespace Appspotdemo.Mono.Droid
 					this.roomid = outerInstance.getToken();
 
                 this.isbroadcaster = true;
+				this.sendBroadcast = json;
 
-                //(function transmit() {}
-
-                JSONObject broadcastJson = new JSONObject();
-                jsonPut(broadcastJson, "roomid", this.roomid);
-                jsonPut(broadcastJson, "url", (string)json.Get("url"));
-                jsonPut(broadcastJson, "user_hash", (string)json.Get("user_hash"));
-                jsonPut(broadcastJson, "broadcasting", true);
-
-                signal(broadcastJson);
-                //
-
-                // if broadcaster leaves; clear all JSON files from Firebase servers
-                //if (socket.onDisconnect) socket.onDisconnect().remove();
+				mTimer = new System.Timers.Timer();
+				mTimer.Interval=3000;
+				mTimer.Elapsed+=new System.Timers.ElapsedEventHandler(OnTimedEvent);
+				mTimer.Enabled=true;
             }
+
+			private void OnTimedEvent(object source, System.Timers.ElapsedEventArgs e)
+			{
+				JSONObject broadcastJson = new JSONObject();
+				jsonPut(broadcastJson, "roomid", this.roomid);
+				jsonPut(broadcastJson, "url", (string)this.sendBroadcast.Get("url"));
+				jsonPut(broadcastJson, "user_hash", (string)this.sendBroadcast.Get("user_hash"));
+				jsonPut(broadcastJson, "broadcasting", true);
+
+				signal(broadcastJson);
+			}
 
             // called for each new participant
 			public void Join(JSONObject config)
@@ -496,7 +627,7 @@ namespace Appspotdemo.Mono.Droid
                 sentParticipationRequest = true;
             }
 
-            void leaveRoom()
+			public void LeaveRoom()
             {
                 JSONObject json = new JSONObject();
                 jsonPut(json, "leaving", true);
@@ -510,33 +641,11 @@ namespace Appspotdemo.Mono.Droid
             // method to signal the data
             public void signal(JSONObject json)
             {
-                jsonPut(json, "userid", userid);
+				jsonPut(json, "userid", outerInstance.userId);
 
 				SocketIOClient.Messages.IMessage msg = new SocketIOClient.Messages.JSONMessage(json.ToString());
 				_socket.Send (msg);
             }
-
-            // custom signaling implementations
-            /*SocketIOClient.Client socket = outerInstance.openSignalingChannel(function(message) {
-                message = JSON.parse(message);
-                if (message.userid != userid) {
-                    if (message.leaving) {
-					    if(message.roomid == signaler.roomid) {
-						    signaler.roomFull = false;
-
-						    root.onuserleft(message.userid);
-						    var peer = peers[message.userid];
-						    if (peer && peer.peer) {
-							    try {
-								    peer.peer.close();
-							    } catch(e) {
-							    }
-							    delete peers[message.userid];
-						    }
-					    }
-                    } else signaler.onmessage(message);
-                }
-            });*/
         }
 
         // Implementation detail: observe ICE & stream changes and react accordingly.
@@ -568,7 +677,7 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "Offer::OnIceGatheringChange == >" + newState);
 
-                if (newState != null/* && newState == IceGatheringState.COMPLETE*/)
+				if (newState != null && newState == IceGatheringState.Complete)
                 {
                     returnSDP();
                 }
@@ -592,7 +701,7 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "Offer::OnIceCandidate == >" + candidate);
 
-                if (candidate != null)
+				if (candidate == null)
                     returnSDP();
                 else
                     Log.Debug(TAG, "injecting ice in sdp: " + candidate);              
@@ -619,6 +728,11 @@ namespace Appspotdemo.Mono.Droid
 
                 //outerInstance.activity.RunOnUiThread(() => stream.VideoTracks.Get(0).Dispose());
             }
+
+			public void OnRenegotiationNeeded ()
+			{
+
+			}
 
             public void OnDataChannel(DataChannel dc)
             {
@@ -674,6 +788,8 @@ namespace Appspotdemo.Mono.Droid
             public void OnSignalingChange(PeerConnection.SignalingState newState)
             {
                 Log.Debug(TAG, "Answer::OnSignalingChange == >" + newState);
+				if (newState == PeerConnection.SignalingState.Closed) {
+				}
             }
 
             public void OnIceConnectionChange(PeerConnection.IceConnectionState newState)
@@ -698,6 +814,11 @@ namespace Appspotdemo.Mono.Droid
                 //outerInstance.activity.RunOnUiThread(() => stream.VideoTracks.Get(0).Dispose());
             }
 
+			public void OnRenegotiationNeeded ()
+			{
+
+			}
+
             public void OnDataChannel(DataChannel dc)
             {
                 Log.Debug(TAG, "Answer::OnDataChannel == >");
@@ -707,11 +828,6 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "Answer::OnError == >");
             }
-		}
-
-		public interface AddStreamObserver
-		{
-			void onAddStreamObserver (MediaStream stream);
 		}
 
         private class SDPObserver : Java.Lang.Object, ISdpObserver
@@ -728,11 +844,12 @@ namespace Appspotdemo.Mono.Droid
             {
                 Log.Debug(TAG, "SDPObserver::OnCreateSuccess == >");
 
-                Log.Debug(TAG, "Sending " + origSdp.Type);
+				SessionDescription sdp = new SessionDescription(origSdp.Type, outerInstance.preferISAC(origSdp.Description));
+				outerInstance.peer.SetLocalDescription(outerInstance.sdpObserver, sdp);
 
-                SessionDescription sdp = new SessionDescription(origSdp.Type, outerInstance.preferISAC(origSdp.Description));
-                outerInstance.peer.SetLocalDescription(outerInstance.sdpObserver, sdp);
-                option.onSdp(sdp, option.to);
+				if (origSdp.Type == SessionDescription.SessionDescriptionType.Answer) {
+					option.onSdp(sdp, option.to);
+				}
             }
 
             public void OnSetSuccess()
@@ -751,15 +868,14 @@ namespace Appspotdemo.Mono.Droid
             }
         }
 
-		public NodeClient(Activity activity, UserMediaObserver userMediaObserver, AddStreamObserver addStreamObserver)
+		public NodeClient(Activity activity, NodeClientObserver nodeClientObserver)
 		{
             this.activity = activity;
-			this.userMediaObserver = userMediaObserver;
-			this.addStreamObserver = addStreamObserver;
+			this.nodeClientObserver = nodeClientObserver;
 
             sdpObserver = new SDPObserver(this);
 
-            //Logging.EnableTracing("", EnumSet.Of(0), (Logging.Severity)4);
+			//Logging.EnableTracing("logcat:", EnumSet.Of(Logging.TraceLevel.TraceAll), Logging.Severity.LsError);
 
             this.iceServers.Add(new PeerConnection.IceServer("turn:turn.appinux.com", "htk", "12345678@X"));
             this.iceServers.Add(new PeerConnection.IceServer("stun:turn.appinux.com"));
@@ -792,15 +908,14 @@ namespace Appspotdemo.Mono.Droid
 		}
 
         public void connectToRoom(string url)
-        {
-			
+        {			
 			if (url.IndexOf ('?') < 0) {
 
                 this.domain = url;
 
 				this.userId = getToken ();
 				this.joinRoom = getToken ();
-				this.app_id = getToken ();
+				this.app_id = "";
 
 				Setup (joinRoom, userId, app_id);
 			} else {
@@ -817,14 +932,23 @@ namespace Appspotdemo.Mono.Droid
 			}
         }
 
-        public void disconnect()
-        {
-            if (signaler != null)
-            {
-				signaler._socket.Close ();
-				signaler._socket = null;
+		public void LeaveRoom()
+		{
+			if (signaler != null) {
+				signaler.LeaveRoom ();
+				signaler.Dispose ();
 				signaler = null;
-            }
+			}
+
+			detectedRoom = false;
+		}
+
+		public void Disconnect()
+        {
+			if (peer != null) {
+				peer.Close ();
+				peer = null;
+			}
         }
 
 		private static void abortUnless(bool condition, string msg)
@@ -908,19 +1032,18 @@ namespace Appspotdemo.Mono.Droid
             }
         }
 
-		public MediaConstraints OptionalArgument
-		{
-			get
-			{
-				return optionalArgument;
-			}
-		}
-
 		public MediaConstraints VideoConstrants
 		{
 			get
 			{
 				return videoConstrants;
+			}
+		}
+
+		public VideoSource VideoSource
+		{
+			get {
+				return videoSource;
 			}
 		}
     }

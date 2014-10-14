@@ -14,12 +14,12 @@
     <AndroidResgenFile>Resources\Resource.Designer.cs</AndroidResgenFile>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
     <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <AndroidSupportedAbis>armeabi,armeabi-v7a,x86</AndroidSupportedAbis>
     <AndroidStoreUncompressedFileExtensions />
     <MandroidI18n />
     <JavaMaximumHeapSize />
     <JavaOptions />
+    <TargetFrameworkVersion>v4.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -68,9 +68,10 @@
     <None Include="java\libs\armeabi-v7a\libjingle_peerconnection_so.so" />
     <None Include="java\project.properties" />
     <None Include="java\README" />
-    <AndroidNativeLibrary Include="lib\armeabi-v7a\libjingle_peerconnection_so.so" />
     <None Include="Resources\AboutResources.txt" />
     <None Include="Assets\AboutAssets.txt" />
+    <None Include="lib\libjingle_peerconnection.jar" />
+    <None Include="lib\armeabi-v7a\libjingle_peerconnection_so.so" />
   </ItemGroup>
   <ItemGroup>
     <AndroidResource Include="Resources\Drawable-xhdpi\ic_launcher.png" />
@@ -101,10 +102,8 @@
     <None Include="java\src\org\appspot\apprtc\GAEChannelClient.java" />
     <None Include="java\src\org\appspot\apprtc\UnhandledExceptionHandler.java" />
     <None Include="java\src\org\appspot\apprtc\VideoStreamsView.java" />
-    <AndroidJavaLibrary Include="lib\libjingle_peerconnection.jar" />
     <AndroidAsset Include="Assets\channel.html" />
     <Compile Include="FramePool.cs" />
-    <Compile Include="GAEChannelClient.cs" />
     <Content Include="LICENSE.txt" />
     <Content Include="Properties\AndroidManifest.xml">
       <SubType>Designer</SubType>
@@ -123,6 +122,10 @@
   </Target>
   -->
   <ItemGroup>
+    <ProjectReference Include="..\Org.Webrtc\Org.Webrtc.csproj">
+      <Project>{413d69ae-11fe-4a56-8a7d-1ce25eeb74f6}</Project>
+      <Name>Org.Webrtc</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SocketIOClient.Android\SocketIOClient.Android.csproj">
       <Project>{34980BC6-0EF3-4B04-95AC-7920F7C619D5}</Project>
       <Name>SocketIOClient.Android</Name>
@@ -130,10 +133,6 @@
     <ProjectReference Include="..\websocket4net\WebSocket4Net.MonoDroid\WebSocket4Net.MonoDroid.csproj">
       <Project>{119C56BD-C133-4D7B-9C33-0F8CE1B1B61E}</Project>
       <Name>WebSocket4Net.MonoDroid</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Org.Webrtc\Org.Webrtc.csproj">
-      <Project>{413D69AE-11FE-4A56-8A7D-1CE25EEB74F6}</Project>
-      <Name>Org.Webrtc</Name>
     </ProjectReference>
   </ItemGroup>
 </Project>

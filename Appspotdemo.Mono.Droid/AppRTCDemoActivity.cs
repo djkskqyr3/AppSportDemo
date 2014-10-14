@@ -20,22 +20,24 @@ using StringBuilder = System.Text.StringBuilder;
 using Thread = System.Threading.Thread;
 using VideoSource = Android.Media.VideoSource;
 using Uri = Android.Net.Uri;
+using VideoTrack = Org.Webrtc.VideoTrack;
 
 namespace Appspotdemo.Mono.Droid
 {
     [Activity(Label = "Appspotdemo.Mono.Droid", MainLauncher = true, Icon = "@drawable/ic_launcher")]
 
-	class AppRTCDemoActivity : Activity, NodeClient.UserMediaObserver, NodeClient.AddStreamObserver
+	class AppRTCDemoActivity : Activity, NodeClient.NodeClientObserver
     {
+		private AppRTCDemoActivity outerInstance;
         private bool InstanceFieldsInitialized = false;
         private const string TAG = "AppRTCDemoActivity";
         private NodeClient appRtcClient;
         private VideoStreamsView vsv;
-        private Toast logToast;
-		private Org.Webrtc.VideoSource videoSource;
 		private readonly Boolean[] quit = new Boolean[] { Boolean.False };
 
-		private PeerConnectionFactory factory;
+		Button btnCreate;
+		Button btnJoin;
+		Button btnHangup;
 		 
         public AppRTCDemoActivity()
 		{
@@ -43,13 +45,14 @@ namespace Appspotdemo.Mono.Droid
 			{
 				InitializeInstanceFields();
 				InstanceFieldsInitialized = true;
+				outerInstance = this;
 			}
 		}
 
         private void InitializeInstanceFields()
         {
 			abortUnless(PeerConnectionFactory.InitializeAndroidGlobals(this), "Failed to initializeAndroidGlobals");
-			appRtcClient = new NodeClient(this, this, this);
+			appRtcClient = new NodeClient(this, this);
         }
 
         protected override void OnCreate(Bundle savedInstanceState)
@@ -61,19 +64,86 @@ namespace Appspotdemo.Mono.Droid
             Window.AddFlags(WindowManagerFlags.Fullscreen);
             Window.AddFlags(WindowManagerFlags.KeepScreenOn);
 
-            Point displaySize = new Point();
-            WindowManager.DefaultDisplay.GetSize(displaySize);
-            vsv = new VideoStreamsView(this, displaySize);
-            SetContentView(vsv);
+			Point displaySize = new Point();
+			WindowManager.DefaultDisplay.GetSize(displaySize);
 
-            Intent intent = Intent;
-            if ("Android.intent.action.VIEW".Equals(intent.Action))
-            {
-                connectToRoom(intent.Data.ToString());
-                return;
-            }
-            showGetRoomUI();
+			// Creating a new RelativeLayout
+			RelativeLayout relativeLayout = new RelativeLayout(this);
+			relativeLayout.SetBackgroundColor (Color.White);
+
+			// Defining the RelativeLayout layout parameters.
+			// In this case I want to fill its parent
+			RelativeLayout.LayoutParams rlp = new RelativeLayout.LayoutParams(
+				RelativeLayout.LayoutParams.FillParent,
+				RelativeLayout.LayoutParams.FillParent);
+
+			// Create, Join, Hangup buttons layout
+			LinearLayout linerLayoutH = new LinearLayout(this);
+			linerLayoutH.Orientation = Android.Widget.Orientation.Horizontal;
+
+			LinearLayout.LayoutParams param = new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WrapContent, LinearLayout.LayoutParams.WrapContent);
+			param.SetMargins(5, 5, 5, 5);
+
+			btnCreate = new Button (this);
+			btnJoin = new Button (this);
+			btnHangup = new Button (this);
+
+			btnCreate.Click += delegate
+			{
+				showCreateRoomUI();
+			};
+
+			btnJoin.Click += delegate
+			{
+				showGetRoomUI();
+			};
+
+			btnHangup.Click += delegate
+			{
+				if (appRtcClient != null) {
+					appRtcClient.LeaveRoom ();
+					appRtcClient.Disconnect();
+				}
+			};
+
+			btnCreate.SetText("Create", Button.BufferType.Normal);
+			btnJoin.SetText("Join", Button.BufferType.Normal);
+			btnHangup.SetText("HangUp", Button.BufferType.Normal);
+
+			btnCreate.SetWidth((displaySize.X - 60) / 3);
+			btnJoin.SetWidth((displaySize.X - 60) / 3);
+			btnHangup.SetWidth((displaySize.X - 60) / 3);
+
+			linerLayoutH.AddView (btnCreate, param);
+			linerLayoutH.AddView (btnJoin, param);
+			linerLayoutH.AddView (btnHangup, param);
+			//
+
+			// VideoStreamView layout
+			LinearLayout linerLayoutV = new LinearLayout(this);
+			linerLayoutV.Orientation = Android.Widget.Orientation.Vertical;
+
+			vsv = new VideoStreamsView(this, new Point(displaySize.X-10, displaySize.Y-10-btnCreate.Height));
+
+			linerLayoutV.AddView (linerLayoutH, param);
+			linerLayoutV.AddView (vsv, param);
+			//
+
+			relativeLayout.AddView (linerLayoutV);
+
+			SetContentView (relativeLayout, rlp);
         }
+
+		private void showCreateRoomUI()
+		{
+			EditText roomInput = new EditText(this);
+			roomInput.Text = "http://meeting.appinux.com";
+			roomInput.SetSelection(roomInput.Text.Length);
+			IDialogInterfaceOnClickListener listener = new OnClickListenerAnonymousInnerClassHelper(this, roomInput);
+			AlertDialog.Builder builder = new AlertDialog.Builder(this);
+			builder.SetMessage("Create room").SetView(roomInput).SetPositiveButton("Create", listener).Show();
+		}
 
         private void showGetRoomUI()
         {
@@ -82,7 +152,7 @@ namespace Appspotdemo.Mono.Droid
             roomInput.SetSelection(roomInput.Text.Length);
             IDialogInterfaceOnClickListener listener = new OnClickListenerAnonymousInnerClassHelper(this, roomInput);
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.SetMessage("Enter room URL").SetView(roomInput).SetPositiveButton("Go!", listener).Show();
+			builder.SetMessage("Enter room URL").SetView(roomInput).SetPositiveButton("Join", listener).Show();
         }
 
         private class OnClickListenerAnonymousInnerClassHelper : Java.Lang.Object, IDialogInterfaceOnClickListener
@@ -105,48 +175,65 @@ namespace Appspotdemo.Mono.Droid
         }
         
         private void connectToRoom(string roomUrl)
-        {
-            logAndToast("Connecting to room...");
+        {            
+			logAndToast ("Connecting to room...");
             appRtcClient.connectToRoom(roomUrl);
         }
 
-        protected override void OnPause()
-        {
-            base.OnPause();
-            vsv.OnPause();
-        }
-
-		public void onUserMediaObserver (JSONObject constraints)
+		protected override void OnPause()
 		{
-			Log.Debug(TAG, "Creating local video source...");
-
-			factory = new PeerConnectionFactory();
-
-			MediaStream lMS = factory.CreateLocalMediaStream("ARDAMS");
-			if (constraints.Has ("video")) {
-				VideoCapturer capturer = VideoCapturer;
-				videoSource = factory.CreateVideoSource(capturer, appRtcClient.VideoConstrants);
-				VideoTrack videoTrack = factory.CreateVideoTrack("ARDAMSv0", videoSource);
-				videoTrack.AddRenderer(new VideoRenderer(new VideoCallbacks(this, vsv, VideoStreamsView.Endpoint.LOCAL)));
-				lMS.AddTrack(videoTrack);
+			base.OnPause();
+			if (vsv != null) {
+				vsv.OnPause ();
 			}
-			lMS.AddTrack(factory.CreateAudioTrack("ARDAMSa0"));
 
-			Log.Debug(TAG, "Waiting for ICE candidates...");
-
-			appRtcClient.onStream (factory, lMS);
+			if (appRtcClient.VideoSource != null)
+			{
+				appRtcClient.VideoSource.Stop ();
+			}
 		}
 
-		public void onAddStreamObserver (MediaStream stream)
+		protected override void OnResume()
 		{
-			//RunOnUiThread(() =>
-			//{
-			//    abortUnless(stream.AudioTracks.Size() <= 1 && stream.VideoTracks.Size() <= 1, "Weird-looking stream: " + stream);
-			//    if (stream.VideoTracks.Size() == 1)
-			//    {
-			//        ((Org.Webrtc.VideoTrack)stream.VideoTracks.Get(0)).AddRenderer(new VideoRenderer(new VideoCallbacks(this, this.vsv, VideoStreamsView.Endpoint.REMOTE)));
-			//    }
-				// });		
+			base.OnResume();
+			if (vsv != null) {
+				vsv.OnResume ();
+			}
+
+			if (appRtcClient.VideoSource != null)
+			{
+				appRtcClient.VideoSource.Restart ();
+			}
+		}
+
+		protected override void OnDestroy()
+		{
+			if (vsv != null) {
+				vsv.OnPause ();
+				vsv.Dispose ();
+				vsv = null;
+			}
+			base.OnDestroy();
+		}
+
+		public void onAddRenderer(VideoTrack videoTrack, bool local)
+		{
+			if (local == true)
+				videoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.LOCAL)));
+			else
+				videoTrack.AddRenderer (new VideoRenderer (new VideoCallbacks (this, vsv, VideoStreamsView.Endpoint.REMOTE)));
+		}
+
+		public void onStatusMessage(string msg)
+		{
+			logAndToast(msg);
+		}
+
+		public void onClose()
+		{
+			if (vsv != null) {
+				//vsv.OnPause ();
+			}
 		}
 
  		// Implementation detail: bridge the VideoRenderer.Callbacks interface to the
@@ -178,40 +265,6 @@ namespace Appspotdemo.Mono.Droid
 			}
 		}
 
-		// Cycle through likely device names for the camera and return the first
-		// capturer that works, or crash if none do.
-		private VideoCapturer VideoCapturer
-		{
-			get
-			{
-				string[] cameraFacing = new string[] { "front", "back" };
-				int[] cameraIndex = new int[] { 0, 1 };
-				int[] cameraOrientation = new int[] { 0, 90, 180, 270 };
-				foreach (string facing in cameraFacing)
-				{
-					foreach (int index in cameraIndex)
-					{
-						foreach (int orientation in cameraOrientation)
-						{
-							string name = "Camera " + index + ", Facing " + facing + ", Orientation " + orientation;
-							VideoCapturer capturer = VideoCapturer.Create(name);
-							if (capturer != null)
-							{
-								Log.Debug (TAG, "Using camera: " + name);
-								return capturer;
-							}
-						}
-					}
-				}
-				throw new Exception("Failed to open capturer");
-			}
-		}
-
-        protected override void OnDestroy()
-        {
-             base.OnDestroy();
-        }
-
         private static void abortUnless(bool condition, string msg)
         {
             if (!condition)
@@ -222,25 +275,7 @@ namespace Appspotdemo.Mono.Droid
 
         private void logAndToast(string msg)
         {
-            Log.Debug(TAG, msg);
-            if (logToast != null)
-            {
-                logToast.Cancel();
-            }
-            logToast = Toast.MakeText(this, msg, ToastLength.Short);
-            logToast.Show();
+			RunOnUiThread(() => Toast.MakeText (this, msg, ToastLength.Long).Show ());
         }
-
-		private static void jsonPut(JSONObject json, string key, Java.Lang.Object value)
-		{
-			try
-			{
-				json.Put(key, value);
-			}
-			catch (JSONException e)
-			{
-				throw new Exception("Error", e);
-			}
-		}
     }
 }

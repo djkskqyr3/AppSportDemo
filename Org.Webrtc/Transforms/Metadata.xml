@@ -8,6 +8,5 @@
   -->
 	<attr path="/api/package[@name='org.webrtc']/class[@name='StatsReport.Value']" name="managedName">StatsReportValue</attr>
 	<attr path="/api/package[@name='org.webrtc']/class[@name='SessionDescription.Type']" name="managedName">SessionDescriptionType</attr>
-	<attr path="/api/package[@name='org.apache.http.cookie']/class[@name='CookiePathComparer']/implements[@name='java.util.Comparator']"
-name="name">java.util.Comparator&lt;org.apache.http.cookie.Cookie&gt;</attr> 
+	
 </metadata>
