@@ -1,0 +1,139 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{81737B3A-C5A9-44E2-8833-E86BC8FF9366}</ProjectGuid>
+    <ProjectTypeGuids>{EFBA0AD7-5A72-4C68-AF49-83D382785DCF};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Appspotdemo.Mono.Droid</RootNamespace>
+    <AssemblyName>Appspotdemo.Mono.Droid</AssemblyName>
+    <FileAlignment>512</FileAlignment>
+    <AndroidApplication>true</AndroidApplication>
+    <AndroidResgenFile>Resources\Resource.Designer.cs</AndroidResgenFile>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+    <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <AndroidSupportedAbis>armeabi,armeabi-v7a,x86</AndroidSupportedAbis>
+    <AndroidStoreUncompressedFileExtensions />
+    <MandroidI18n />
+    <JavaMaximumHeapSize />
+    <JavaOptions />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <AndroidLinkSkip>
+    </AndroidLinkSkip>
+    <EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AndroidUseSharedRuntime>False</AndroidUseSharedRuntime>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Android" />
+    <Reference Include="Mono.Android.Export" />
+    <Reference Include="mscorlib" />
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net40\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="NodeClient.cs" />
+    <Compile Include="AppRTCDemoActivity.cs" />
+    <Compile Include="MeetingRequest.cs" />
+    <Compile Include="Resources\Resource.Designer.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="java\ant.properties" />
+    <None Include="java\gen\R.java.d" />
+    <None Include="java\libs\armeabi-v7a\libjingle_peerconnection_so.so" />
+    <None Include="java\project.properties" />
+    <None Include="java\README" />
+    <AndroidNativeLibrary Include="lib\armeabi-v7a\libjingle_peerconnection_so.so" />
+    <None Include="Resources\AboutResources.txt" />
+    <None Include="Assets\AboutAssets.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <AndroidResource Include="Resources\Drawable-xhdpi\ic_launcher.png" />
+    <AndroidResource Include="Resources\Drawable-mdpi\ic_launcher.png" />
+    <AndroidResource Include="Resources\Drawable-ldpi\ic_launcher.png" />
+    <AndroidResource Include="Resources\Drawable-hdpi\ic_launcher.png" />
+    <AndroidResource Include="Resources\Values\strings.xml" />
+    <Compile Include="Status.cs" />
+    <Compile Include="StringHelperClass.cs" />
+    <Compile Include="VideoStreamsView.cs" />
+    <Compile Include="UnhandledExceptionHandler.cs" />
+    <AndroidResource Include="Resources\Raw\telephonering02.wav" />
+    <None Include="java\AndroidManifest.xml" />
+    <None Include="java\assets\channel.html" />
+    <None Include="java\build.xml" />
+    <None Include="java\gen\org\appspot\apprtc\BuildConfig.java" />
+    <None Include="java\gen\org\appspot\apprtc\R.java" />
+    <None Include="java\jni\Android.mk" />
+    <None Include="java\libs\libjingle_peerconnection.jar" />
+    <None Include="java\res\drawable-hdpi\ic_launcher.png" />
+    <None Include="java\res\drawable-ldpi\ic_launcher.png" />
+    <None Include="java\res\drawable-mdpi\ic_launcher.png" />
+    <None Include="java\res\drawable-xhdpi\ic_launcher.png" />
+    <None Include="java\res\values\strings.xml" />
+    <None Include="java\src\org\appspot\apprtc\AppRTCClient.java" />
+    <None Include="java\src\org\appspot\apprtc\AppRTCDemoActivity.java" />
+    <None Include="java\src\org\appspot\apprtc\FramePool.java" />
+    <None Include="java\src\org\appspot\apprtc\GAEChannelClient.java" />
+    <None Include="java\src\org\appspot\apprtc\UnhandledExceptionHandler.java" />
+    <None Include="java\src\org\appspot\apprtc\VideoStreamsView.java" />
+    <AndroidJavaLibrary Include="lib\libjingle_peerconnection.jar" />
+    <AndroidAsset Include="Assets\channel.html" />
+    <Compile Include="FramePool.cs" />
+    <Compile Include="GAEChannelClient.cs" />
+    <Content Include="LICENSE.txt" />
+    <Content Include="Properties\AndroidManifest.xml">
+      <SubType>Designer</SubType>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resources\Drawable\" />
+    <Folder Include="Resources\Layout\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+     Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\SocketIOClient.Android\SocketIOClient.Android.csproj">
+      <Project>{34980BC6-0EF3-4B04-95AC-7920F7C619D5}</Project>
+      <Name>SocketIOClient.Android</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\websocket4net\WebSocket4Net.MonoDroid\WebSocket4Net.MonoDroid.csproj">
+      <Project>{119C56BD-C133-4D7B-9C33-0F8CE1B1B61E}</Project>
+      <Name>WebSocket4Net.MonoDroid</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Org.Webrtc\Org.Webrtc.csproj">
+      <Project>{413D69AE-11FE-4A56-8A7D-1CE25EEB74F6}</Project>
+      <Name>Org.Webrtc</Name>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

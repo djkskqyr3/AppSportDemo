@@ -1,0 +1,21 @@
+﻿<Properties>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Org.Webrtc\Transforms\Metadata.xml">
+    <Files>
+      <File FileName="Appspotdemo.Mono.Droid\AppRTCDemoActivity.cs" Line="25" Column="2" />
+      <File FileName="Appspotdemo.Mono.Droid\NodeClient.cs" Line="1" Column="1" />
+      <File FileName="Org.Webrtc\Transforms\Metadata.xml" Line="4" Column="53" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore>
+      <Breakpoint file="D:\Xamarin\Project\AppSportDemo.Mono(20140407)\Appspotdemo.Mono.Droid\NodeClient.cs" line="608" column="1" />
+      <Breakpoint file="D:\Xamarin\Project\AppSportDemo.Mono(20140407)\Appspotdemo.Mono.Droid\NodeClient.cs" line="613" column="1" />
+      <Breakpoint file="D:\Xamarin\Project\AppSportDemo.Mono(20140407)\Appspotdemo.Mono.Droid\NodeClient.cs" line="603" column="1" />
+    </BreakpointStore>
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches>
+    <Watch file="d:\Xamarin\Project\AppSportDemo.Mono(20140407)\SocketIOClient.Android\Client.cs" line="625" offsetX="1729" offsetY="10608" expression="uri" liveUpdate="False" />
+    <Watch file="Appspotdemo.Mono.Droid\AppRTCDemoActivity.cs" line="144" offsetX="959" offsetY="2431" expression="stream" liveUpdate="False" />
+  </MonoDevelop.Ide.DebuggingService.PinnedWatches>
+</Properties>
